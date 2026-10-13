@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>FNC·compiler — Depuración y conversión de GLC a FNC</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+
+    <!-- ==================== Barra superior ==================== -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="4.5" r="2.1"></circle>
+            <circle cx="5" cy="19" r="2.1"></circle>
+            <circle cx="19" cy="19" r="2.1"></circle>
+            <path d="M11 6.4 6.1 17.1"></path>
+            <path d="M13 6.4 17.9 17.1"></path>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">FNC<span class="brand-sep">·</span>compiler</span>
+          <span class="brand-sub">Depuración y conversión de GLC</span>
+        </span>
+      </div>
+
+      <div class="status" id="statusBox" data-state="idle">
+        <span class="status-led" aria-hidden="true"></span>
+        <span id="estadoBadge" class="status-text">sin gramática</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+
+      <!-- ==================== Pipeline ==================== -->
+      <section class="pipeline-panel" aria-labelledby="pipelineTitle">
+        <div class="panel-head">
+          <h2 id="pipelineTitle">Pipeline de depuración</h2>
+          <p class="panel-sub">Cada etapa corre sobre la gramática del editor. Si hay errores,
+            se avisa y no se transforma nada: corrige y vuelve a intentar.</p>
+        </div>
+
+        <ol class="pipeline" id="pipeline">
+          <li class="stage" data-etapa="nulas">
+            <button type="button" class="stage-btn" data-paso="nulas">
+              <span class="stage-num">01</span>
+              <span class="stage-body">
+                <span class="stage-title">Producciones nulas</span>
+                <span class="stage-desc">Elimina las ε y las alternativas derivadas</span>
+              </span>
+            </button>
+          </li>
+          <li class="stage" data-etapa="unitarias">
+            <button type="button" class="stage-btn" data-paso="unitarias">
+              <span class="stage-num">02</span>
+              <span class="stage-body">
+                <span class="stage-title">Producciones unitarias</span>
+                <span class="stage-desc">Quita las reglas del tipo A → B</span>
+              </span>
+            </button>
+          </li>
+          <li class="stage" data-etapa="inutiles">
+            <button type="button" class="stage-btn" data-paso="inutiles">
+              <span class="stage-num">03</span>
+              <span class="stage-body">
+                <span class="stage-title">Variables inútiles</span>
+                <span class="stage-desc">Descarta las que no generan nada</span>
+              </span>
+            </button>
+          </li>
+          <li class="stage" data-etapa="inalcanzables">
+            <button type="button" class="stage-btn" data-paso="inalcanzables">
+              <span class="stage-num">04</span>
+              <span class="stage-body">
+                <span class="stage-title">Variables inalcanzables</span>
+                <span class="stage-desc">Descarta las no alcanzables desde S</span>
+              </span>
+            </button>
+          </li>
+          <li class="stage" data-etapa="terminales">
+            <button type="button" class="stage-btn" data-paso="terminales">
+              <span class="stage-num">05</span>
+              <span class="stage-body">
+                <span class="stage-title">Sustituir terminales</span>
+                <span class="stage-desc">Aísla terminales en producciones largas</span>
+              </span>
+            </button>
+          </li>
+          <li class="stage" data-etapa="binaria">
+            <button type="button" class="stage-btn" data-paso="binaria">
+              <span class="stage-num">06</span>
+              <span class="stage-body">
+                <span class="stage-title">Forma binaria</span>
+                <span class="stage-desc">Reduce los lados derechos a 2 símbolos</span>
+              </span>
+            </button>
+          </li>
+        </ol>
+
+        <div class="row pipeline-actions">
+          <button id="btnCompleto" type="button" class="btn btn-signal">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2.5 8.5 6 12l7.5-8"></path>
+            </svg>
+            Ejecutar proceso completo
+          </button>
+          <button id="btnFinal" type="button" class="btn">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 2.5v11"></path>
+              <path d="M3 3h8.5l-2 3 2 3H3"></path>
+            </svg>
+            Marcar editor como final
+          </button>
+          <button id="btnReiniciar" type="button" class="btn btn-ghost">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M13 8a5 5 0 1 1-1.5-3.6"></path>
+              <path d="M13 2.5V5.2h-2.7"></path>
+            </svg>
+            Reiniciar proceso
+          </button>
+        </div>
+      </section>
+
+      <!-- ==================== Fuente ==================== -->
+      <section class="panel source" aria-labelledby="sourceTitle">
+        <div class="panel-head">
+          <h2 id="sourceTitle">Fuente</h2>
+          <span class="tag tag-edit">editable</span>
+        </div>
+
+        <p class="hint">
+          Cada variable y terminal es de <strong>un solo carácter</strong> (S, A… / a, b…). La cadena
+          vacía se escribe <code>epsilon</code>. Puedes editar y <strong>validar</strong> antes de cada paso.
+        </p>
+
+        <div class="fields">
+          <label>Variables
+            <input id="variables" type="text" placeholder="S, A, B" autocomplete="off"
+                   spellcheck="false">
+          </label>
+          <label>Terminales
+            <input id="terminales" type="text" placeholder="a, b" autocomplete="off"
+                   spellcheck="false">
+          </label>
+          <label>Símbolo inicial
+            <input id="inicial" type="text" placeholder="S" autocomplete="off" spellcheck="false">
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="label-row">
+            <span>Producciones</span>
+            <span class="hint-inline">formato A → BC | a | epsilon, una por línea</span>
+          </span>
+          <div class="editor">
+            <div class="editor-gutter" id="lineNumbers" aria-hidden="true">1</div>
+            <textarea id="producciones" rows="8" spellcheck="false" wrap="off"
+              placeholder="S -> ASA | aB | epsilon&#10;A -> B | S&#10;B -> b | epsilon"></textarea>
+          </div>
+        </label>
+
+        <div class="row">
+          <button id="btnRegistrar" type="button" class="btn btn-signal">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2.5 8.5 6 12l7.5-8"></path>
+            </svg>
+            Registrar gramática
+          </button>
+          <button id="btnValidar" type="button" class="btn">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 1.6 13.5 3.6v3.7c0 3.1-2.3 5.5-5.5 6.9-3.2-1.4-5.5-3.8-5.5-6.9V3.6z"></path>
+              <path d="M5.6 7.9 7.3 9.6l3.1-3.5"></path>
+            </svg>
+            Validar
+          </button>
+          <button id="btnEjemplo" type="button" class="btn btn-ghost">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6.2 1.8h3.6"></path>
+              <path d="M8 1.8v3.4l3.9 6.1a1.7 1.7 0 0 1-1.4 2.6H5.5a1.7 1.7 0 0 1-1.4-2.6L8 5.2"></path>
+            </svg>
+            Cargar ejemplo
+          </button>
+          <button id="btnLimpiar" type="button" class="btn btn-ghost">
+            <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2.5 4.5h11"></path>
+              <path d="M6 4.5V3h4v1.5"></path>
+              <path d="M4 4.5l.7 9h6.6l.7-9"></path>
+            </svg>
+            Limpiar
+          </button>
+        </div>
+
+        <div id="mensajes" class="mensajes" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <!-- ==================== Salidas ==================== -->
+      <section class="outputs" aria-label="Resultados de la conversión">
+        <article class="readout" data-kind="source">
+          <div class="readout-bar">
+            <span class="readout-dot" aria-hidden="true"></span>
+            <span class="readout-title">gramática_original</span>
+          </div>
+          <pre id="gramOriginal" class="code">—</pre>
+        </article>
+
+        <article class="readout" data-kind="final" id="finalPanel">
+          <div class="readout-bar">
+            <span class="readout-dot" aria-hidden="true"></span>
+            <span class="readout-title">gramática_final · FNC</span>
+          </div>
+          <pre id="gramFinal" class="code">—</pre>
+          <div id="fncCheck" class="fnc-check"></div>
+        </article>
+      </section>
+
+      <!-- ==================== Bitácora ==================== -->
+      <section class="panel bitacora" aria-labelledby="bitacoraTitle">
+        <div class="panel-head">
+          <h2 id="bitacoraTitle">Bitácora de transformaciones</h2>
+          <button id="btnLimpiarHistorial" type="button" class="btn btn-ghost btn-sm">
+            Vaciar bitácora
+          </button>
+        </div>
+        <div id="historial" class="historial"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span class="footer-chip">local</span>
+      <span>Todo el procesamiento ocurre en el navegador. No se envía nada a ningún servidor.</span>
+    </footer>
+  </div>
+
+  <script src="js/grammar.js"></script>
+  <script src="js/transformations.js"></script>
+  <script src="js/historial.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
